@@ -12,7 +12,9 @@ type IpItem struct {
 	end     *big.Int
 	country    string
     state      string
+	state2       string
     city       string
+	postcode     string
     latitude   string
     longitude  string
 }

@@ -165,7 +165,8 @@ func ReadAndGet(fn string) []IpItem {
 		start, _ = start.SetString(record[0], 10)
 		end := new(big.Int)
 		end, _ = end.SetString(record[1], 10)
-		ip_items = append(ip_items, IpItem{start, end, record[2], record[3], record[4], record[5], record[6]})
+		ip_items = append(ip_items, IpItem{start, end, record[2], record[3], 
+			record[4], record[5], record[6], record[7], record[8]})
 	}
 	f.Close()
 	return ip_items
@@ -202,6 +203,7 @@ func main() {
 				c.JSON(http.StatusOK, gin.H{
 					"ok":      true,
 					"country": ip_items[idx].country,
+					"state": ip_items[idx].state,
 					"city": ip_items[idx].city,
 					"latitude": ip_items[idx].latitude,
 					"longitude": ip_items[idx].longitude,

@@ -10,7 +10,11 @@ var ErrNotFound = errors.New("target not found")
 type IpItem struct {
 	start   *big.Int
 	end     *big.Int
-	country string
+	country    string
+    state      string
+    city       string
+    latitude   string
+    longitude  string
 }
 
 func Binary(array []IpItem, target *big.Int, lowIndex int, highIndex int) (int, error) {

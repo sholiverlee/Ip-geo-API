@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strings"
 
 	"crypto/sha256"
 	"encoding/hex"
@@ -19,6 +20,8 @@ import (
 
 	"path"
 
+	"compress/gzip"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -26,13 +29,14 @@ type GitHubResponse struct {
 	Sha string `json:"sha"`
 }
 
-func downloadCsv() {
+func downloadCsv(fn string) {
 	folderPath := "./downloads"
 	githubRepo := "sapics/ip-location-db"
 
+	// "https://github.com/sapics/ip-location-db/raw/main/dbip-city/dbip-city-ipv4.csv.gz",
 	urls := []string{
-		fmt.Sprintf("https://cdn.jsdelivr.net/gh/%s/%s", githubRepo, "geo-whois-asn-country/geo-whois-asn-country-ipv4-num.csv"),
-		fmt.Sprintf("https://cdn.jsdelivr.net/gh/%s/%s", githubRepo, "geo-asn-country/geo-asn-country-ipv6-num.csv"),
+		fmt.Sprintf("https://github.com/%s/%s/%s", githubRepo, "/raw/main/dbip-city", fn),
+	//	fmt.Sprintf("https://cdn.jsdelivr.net/gh/%s/%s", githubRepo, "/raw/main/geo-asn-country/geo-asn-country-ipv6-num.csv"),
 	}
 
 	if _, err := os.Stat(folderPath); os.IsNotExist(err) {
@@ -118,8 +122,38 @@ func Ip2Int(ip net.IP) *big.Int {
 	return i
 }
 
+func extractGZ(fn string, outPath string) error {
+	gzPath := "./downloads" + "/" + fn
+
+    // Open the gzipped file.
+    gzFile, err := os.Open(gzPath)
+    if err != nil {
+        return err
+    }
+    defer gzFile.Close()
+
+    // Create a gzip reader.
+    gzReader, err := gzip.NewReader(gzFile)
+    if err != nil {
+        return err
+    }
+    defer gzReader.Close()
+
+    // Create the output file.
+    outFile, err := os.Create("./downloads" + "/" + outPath)
+    if err != nil {
+        return err
+    }
+    defer outFile.Close()
+
+    // Copy the decompressed data from the gzip reader to the output file.
+    _, err = io.Copy(outFile, gzReader)
+    return err // This will be nil if everything was successful.
+}
+
 func ReadAndGet(fn string) []IpItem {
 	var ip_items []IpItem = []IpItem{}
+	
 	f, _ := os.Open("./downloads" + "/" + fn)
 	r := csv.NewReader(f)
 	for {
@@ -131,19 +165,22 @@ func ReadAndGet(fn string) []IpItem {
 		start, _ = start.SetString(record[0], 10)
 		end := new(big.Int)
 		end, _ = end.SetString(record[1], 10)
-		ip_items = append(ip_items, IpItem{start, end, record[2]})
+		ip_items = append(ip_items, IpItem{start, end, record[2], record[3], record[4], record[5], record[6]})
 	}
 	f.Close()
 	return ip_items
 }
 
 func main() {
-	downloadCsv()
+	gzFile := "dbip-city-ipv4-num.csv.gz"
+	downloadCsv(gzFile)
 
 	var ip_items []IpItem = []IpItem{}
-	ip_items = append(ip_items, ReadAndGet("geo-whois-asn-country-ipv4-num.csv")...)
-	ip_items = append(ip_items, ReadAndGet("geo-asn-country-ipv6-num.csv")...)
+	csvFile := strings.TrimSuffix(gzFile, ".gz")
+	extractGZ(gzFile, csvFile)
 
+	ip_items = append(ip_items, ReadAndGet(csvFile)...)
+	
 	sort.Slice(ip_items, func(i, j int) bool {
 		return ip_items[i].start.Cmp(ip_items[j].start) == -1
 	})
@@ -165,6 +202,9 @@ func main() {
 				c.JSON(http.StatusOK, gin.H{
 					"ok":      true,
 					"country": ip_items[idx].country,
+					"city": ip_items[idx].city,
+					"latitude": ip_items[idx].latitude,
+					"longitude": ip_items[idx].longitude,
 				})
 				return
 			}
